@@ -1,2 +1,2 @@
-# Create-StaffAccount
-Monitors an independent database for new entries and prepares accounts when needed.
+# Update-AdEmployeeID
+Monitors an independent database for new entries and updates Active Directory User objects as needed
