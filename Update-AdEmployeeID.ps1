@@ -73,7 +73,7 @@ function Get-ADObj {
   }
   $obj = Get-ADUser @adParams
   if ($obj.count -gt 1) {
-   'ERROR - More than one ad account with email address [{0}]' -f $_.emailHome
+   Write-Error ('Multiple AD objects with email address [{0}]' -f $_.emailWork)
    return
   }
   $obj
@@ -84,11 +84,7 @@ function New-PSObj {
  process {
   Write-Verbose ('{0}' -f $MyInvocation.MyCommand.Name)
   $obj = $_ | Get-ADObj
-  if ($obj -match 'ERROR') {
-   $msg = $MyInvocation.MyCommand.Name, $_.emailWork
-   Write-Error ('{0},More than one account found with email address [{1}]' -f $msg)
-   return
-  }
+  if ($null -eq $obj) { return }
   # create object with AD ObjectGUID and Intermediate DB data
   [PSCustomObject]@{
    id         = $_.id
@@ -106,10 +102,11 @@ function Update-EmpId {
   $msg = $MyInvocation.MyCommand.Name, $_.employeeId, $_.mail
   Write-Host ('{0},[{1}],[{2}]' -f $msg) -Fore DarkYellow
   $setParams = @{
-   Identity   = $_.guid
-   EmployeeID = $_.employeeId
-   Confirm    = $false
-   WhatIf     = $WhatIf
+   Identity    = $_.guid
+   EmployeeID  = $_.employeeId
+   Confirm     = $false
+   WhatIf      = $WhatIf
+   ErrorAction = 'Stop'
   }
   Set-ADUser @setParams
   $_ | Add-Member -MemberType NoteProperty -Name status -Value success
@@ -170,6 +167,8 @@ do {
  Show-TestRun
  if (-not$WhatIf) {
   # Loop delay
+  $nextRun = (Get-Date).AddSeconds($delay)
+  'Next Run: {0}' -f $nextRun
   Start-Sleep $delay
  }
 } until ($WhatIf -or ((Get-Date) -ge $stopTime))
