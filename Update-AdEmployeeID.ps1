@@ -163,8 +163,9 @@ do {
  $dc = Select-DomainController $DomainControllers
  New-ADSession -dc $dc -cmdlets 'Get-ADUser', 'Set-ADUser' -Cred $ActiveDirectoryCredential
 
- Get-Accounts $AccountsTable $intDBparams | Get-EmpData |
- New-PSObj | Update-EmpId | Update-IntDB $AccountsTable $intDBparams
+ $inDBResults = Get-Accounts $AccountsTable $intDBparams
+ $opObjs = $inDBResults | Get-EmpData | New-PSObj
+ $opObjs | Update-EmpId | Update-IntDB $AccountsTable $intDBparams
  # $accounts = Get-Accounts $AccountsTable $intDBparams
  # $accounts | Get-EmpData | New-PSObj | Update-EmpId | Update-IntDB $AccountsTable $intDBparams
 
