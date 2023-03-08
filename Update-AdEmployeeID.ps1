@@ -35,7 +35,7 @@ function Get-Accounts ($table, $dbParams) {
  process {
   Write-Verbose ($_ | Out-String)
   if ($_.employeeId -is [DBNull]) {
-   Write-Host ('{0},employeeId seems to be null' -f $MyInvocation.MyCommand.Name)
+   Write-Verbose ('{0},employeeId seems to be null' -f $MyInvocation.MyCommand.Name)
    return
   }
   $sql = 'SELECT * FROM {0} WHERE status IS NULL;' -f $table
@@ -162,8 +162,6 @@ do {
  $opObjs | Update-EmpId | Update-IntDB $AccountsTable $intDBparams
 
  Clear-SessionData
- Show-TestRun
-
  Show-TestRun
  if (-not$WhatIf) {
   # Loop delay
