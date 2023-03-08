@@ -35,6 +35,27 @@ param(
  [switch]$WhatIf
 )
 
+function Get-Accounts ($table, $dbParams) {
+ process {
+  Write-Verbose ($_ | Out-String)
+  if ($_.employeeId -is [DBNull]) {
+   Write-Host ('{0},employeeId seems to be null' -f $MyInvocation.MyCommand.Name)
+   return
+  }
+  # $sql = 'SELECT * FROM {0} WHERE status IS NULL;' -f $table
+  $sql = 'SELECT * FROM {0};' -f $table
+  $msg = @(
+   $MyInvocation.MyCommand.Name
+   $dbParams.Server
+   $dbParams.Database
+   $dbParams.Credential.Username
+   $sql
+  )
+  Write-Host ('{0},[{1}-{2}] as [{3}],[{4}]' -f $msg) -Fore DarkGreen
+  Invoke-Sqlcmd @dbParams -Query $sql
+ }
+}
+
 function Get-EmpData {
  begin {
   $empDBParams = @{
@@ -44,7 +65,7 @@ function Get-EmpData {
   }
  }
  process {
-  $sql = 'SELECT empId FROM {0} WHERE empId = {1}' -f $EmpTable, $_.employeeId
+  $sql = 'SELECT empId FROM {0} WHERE empId = {1};' -f $EmpTable, $_.employeeId
   $emp = Invoke-SqlCmd @empDBParams -Query $sql
   if (-not$emp) {
    $msg = $MyInvocation.MyCommand.Name, $_.employeeId, $_.emailWork, $_.emailHome, $sql
@@ -52,27 +73,6 @@ function Get-EmpData {
    return
   }
   $_
- }
-}
-
-function Get-Accounts ($table, $dbParams) {
- process {
-  Write-Verbose ($_ | Out-String)
-  if ($_.employeeId -is [DBNull]) {
-   Write-Host ('{0},employeeId seems to be null' -f $MyInvocation.MyCommand.Name)
-   return
-  }
-  $sql = "SELECT * FROM {0} WHERE status IS NULL" -f $table
-  $msg = @(
-   $MyInvocation.MyCommand.Name,
-   $IntermediateSqlServer,
-   $IntermediateDatabase,
-   $AccountsTable,
-   $IntermediateCredential.Username
-   $sql
-  )
-  Write-Host ('{0},[{1}-{2}-{3}] as [{4}],[{5}]' -f $msg) -Fore DarkGreen
-  Invoke-Sqlcmd @dbParams -Query $sql
  }
 }
 
@@ -113,7 +113,8 @@ function New-PSObj {
 
 function Update-EmpId {
  process {
-  Write-Host ('{0},[{1}],[{2}]' -f $MyInvocation.MyCommand.Name, $_.employeeId, $_.mail)
+  $msg = $MyInvocation.MyCommand.Name, $_.employeeId, $_.mail
+  Write-Host ('{0},[{1}],[{2}]' -f $msg) -Fore DarkYellow
   $setParams = @{
    Identity   = $_.guid
    EmployeeID = $_.employeeId
@@ -128,10 +129,9 @@ function Update-EmpId {
 
 function Update-IntDB ($table, $dbParams) {
  process {
-  $sql = "UPDATE {0} SET status = `'{1}`', dts = CURRENT_TIMESTAMP WHERE id = {2}" -f $table, $_.status, $_.id
-  Write-Host $sql -Fore Blue
-  $msg = $MyInvocation.MyCommand.Name, $_.employeeId, $_.mail, $_.status
-  Write-Host ('{0},[{1}],[{2}],[{3}]' -f $msg)
+  $sql = "UPDATE {0} SET status = `'{1}`', dts = CURRENT_TIMESTAMP WHERE id = {2};" -f $table, $_.status, $_.id
+  $msg = $MyInvocation.MyCommand.Name, $_.employeeId, $_.mail, $_.status, $sql
+  Write-Host ('{0},[{1}],[{2}],[{3}],[{4}]' -f $msg) -Fore DarkYellow
   if (-not$WhatIf) { Invoke-SqlCmd @dbparams -Query $sql }
  }
 }
@@ -166,8 +166,6 @@ do {
  $inDBResults = Get-Accounts $AccountsTable $intDBparams
  $opObjs = $inDBResults | Get-EmpData | New-PSObj
  $opObjs | Update-EmpId | Update-IntDB $AccountsTable $intDBparams
- # $accounts = Get-Accounts $AccountsTable $intDBparams
- # $accounts | Get-EmpData | New-PSObj | Update-EmpId | Update-IntDB $AccountsTable $intDBparams
 
  Clear-SessionData
  Show-TestRun
