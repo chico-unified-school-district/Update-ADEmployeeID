@@ -145,7 +145,7 @@ $empDBParams = @{
 }
 
 $stopTime = Get-Date "9:00pm"
-$delay = 3600
+$delay = 60
 'Process looping every {0} seconds until {1}' -f $delay, $stopTime
 do {
  Show-TestRun
@@ -167,8 +167,8 @@ do {
  Show-TestRun
  if (-not$WhatIf) {
   # Loop delay
-  $nextRun = (Get-Date).AddSeconds($delay)
-  'Next Run: {0}' -f $nextRun
+  # $nextRun = (Get-Date).AddSeconds($delay)
+  # 'Next Run: {0}' -f $nextRun
   Start-Sleep $delay
  }
 } until ($WhatIf -or ((Get-Date) -ge $stopTime))
