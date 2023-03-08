@@ -31,7 +31,7 @@ param(
  [switch]$WhatIf
 )
 
-function Get-Accounts ($table, $dbParams) {
+function Get-IntDBData ($table, $dbParams) {
  process {
   $sql = 'SELECT * FROM {0} WHERE status IS NULL;' -f $table
   $msg = @(
@@ -41,7 +41,7 @@ function Get-Accounts ($table, $dbParams) {
    $dbParams.Credential.Username
    $sql
   )
-  Write-Host ('{0},[{1}-{2}] as [{3}],[{4}]' -f $msg) -Fore DarkGreen
+  Write-Verbose ('{0},[{1}-{2}] as [{3}],[{4}]' -f $msg)
   Invoke-Sqlcmd @dbParams -Query $sql
  }
 }
@@ -152,7 +152,7 @@ do {
  $dc = Select-DomainController $DomainControllers
  New-ADSession -dc $dc -cmdlets 'Get-ADUser', 'Set-ADUser' -Cred $ActiveDirectoryCredential
 
- $intDBResults = Get-Accounts $AccountsTable $intDBparams
+ $intDBResults = Get-IntDBData $AccountsTable $intDBparams
  $opObjs = $intDBResults | Get-EmpData $empDBParams $EmpTable | New-PSObj
  $opObjs | Update-ADEmpId | Update-IntDB $AccountsTable $intDBparams
 
