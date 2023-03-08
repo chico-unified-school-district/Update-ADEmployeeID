@@ -24,13 +24,9 @@ param(
  [string]$IntermediateSqlServer,
  [Alias('IntDB')]
  [string]$IntermediateDatabase,
- [Alias('Table')]
  [string]$AccountsTable,
  [Alias('IntCred')]
  [System.Management.Automation.PSCredential]$IntermediateCredential,
- [Alias('OU')]
- [string]$TargetOrgUnit,
- [string]$Organization,
  [Alias('wi')]
  [switch]$WhatIf
 )
@@ -42,8 +38,7 @@ function Get-Accounts ($table, $dbParams) {
    Write-Host ('{0},employeeId seems to be null' -f $MyInvocation.MyCommand.Name)
    return
   }
-  # $sql = 'SELECT * FROM {0} WHERE status IS NULL;' -f $table
-  $sql = 'SELECT * FROM {0};' -f $table
+  $sql = 'SELECT * FROM {0} WHERE status IS NULL;' -f $table
   $msg = @(
    $MyInvocation.MyCommand.Name
    $dbParams.Server
@@ -56,14 +51,7 @@ function Get-Accounts ($table, $dbParams) {
  }
 }
 
-function Get-EmpData {
- begin {
-  $empDBParams = @{
-   Server     = $EmpDBServer
-   Database   = $EmpDatabase
-   Credential = $EmpDBCredential
-  }
- }
+function Get-EmpData ($dbParams, $table) {
  process {
   $sql = 'SELECT empId FROM {0} WHERE empId = {1};' -f $EmpTable, $_.employeeId
   $emp = Invoke-SqlCmd @empDBParams -Query $sql
@@ -78,10 +66,12 @@ function Get-EmpData {
 
 function Get-ADObj {
  process {
-  # this filter allows for our 2 types of email address
-  $filter = "mail -eq `'{0}`' -or homepage -eq `'{0}`'" -f $_.emailWork
-  $properties = 'employeeId', 'mail', 'homepage'
-  $obj = Get-ADUser -Filter $filter -Properties $properties
+  $adParams = @{
+   # this filter allows for our 2 types of email address
+   Filter     = "mail -eq `'{0}`' -or homepage -eq `'{0}`'" -f $_.emailWork
+   Properties = 'employeeId', 'mail', 'homepage'
+  }
+  $obj = Get-ADUser @adParams
   if ($obj.count -gt 1) {
    'ERROR - More than one ad account with email address [{0}]' -f $_.emailHome
    return
@@ -145,6 +135,18 @@ function Update-IntDB ($table, $dbParams) {
 . .\lib\Select-DomainController.ps1
 . .\lib\Show-TestRun.ps1
 
+$intDBparams = @{
+ Server     = $IntermediateSqlServer
+ Database   = $IntermediateDatabase
+ Credential = $IntermediateCredential
+}
+
+$empDBParams = @{
+ Server     = $EmpDBServer
+ Database   = $EmpDatabase
+ Credential = $EmpDBCredential
+}
+
 $stopTime = Get-Date "9:00pm"
 $delay = 3600
 'Process looping every {0} seconds until {1}' -f $delay, $stopTime
@@ -154,18 +156,15 @@ do {
 
  'SQLServer' | Load-Module
 
- $intDBparams = @{
-  Server     = $IntermediateSqlServer
-  Database   = $IntermediateDatabase
-  Credential = $IntermediateCredential
- }
 
  $dc = Select-DomainController $DomainControllers
  New-ADSession -dc $dc -cmdlets 'Get-ADUser', 'Set-ADUser' -Cred $ActiveDirectoryCredential
 
- $inDBResults = Get-Accounts $AccountsTable $intDBparams
- $opObjs = $inDBResults | Get-EmpData | New-PSObj
- $opObjs | Update-EmpId | Update-IntDB $AccountsTable $intDBparams
+ Get-Accounts $AccountsTable $intDBparams |
+ Get-EmpData $empDBParams $EmpTable |
+ New-PSObj |
+ Update-EmpId |
+ Update-IntDB $AccountsTable $intDBparams
 
  Clear-SessionData
  Show-TestRun
