@@ -33,11 +33,6 @@ param(
 
 function Get-Accounts ($table, $dbParams) {
  process {
-  Write-Verbose ($_ | Out-String)
-  if ($_.employeeId -is [DBNull]) {
-   Write-Verbose ('{0},employeeId seems to be null' -f $MyInvocation.MyCommand.Name)
-   return
-  }
   $sql = 'SELECT * FROM {0} WHERE status IS NULL;' -f $table
   $msg = @(
    $MyInvocation.MyCommand.Name
@@ -97,7 +92,7 @@ function New-PSObj {
  }
 }
 
-function Update-EmpId {
+function Update-ADEmpId {
  process {
   $msg = $MyInvocation.MyCommand.Name, $_.employeeId, $_.mail
   Write-Host ('{0},[{1}],[{2}]' -f $msg) -Fore DarkYellow
@@ -159,7 +154,7 @@ do {
 
  $intDBResults = Get-Accounts $AccountsTable $intDBparams
  $opObjs = $intDBResults | Get-EmpData $empDBParams $EmpTable | New-PSObj
- $opObjs | Update-EmpId | Update-IntDB $AccountsTable $intDBparams
+ $opObjs | Update-ADEmpId | Update-IntDB $AccountsTable $intDBparams
 
  Clear-SessionData
  Show-TestRun
