@@ -124,9 +124,9 @@ function Update-IntDB ($table, $dbParams) {
 UPDATE {0}
 SET
 gsuite = '{1}'
-samid = '{2}'
-status = '{3}',
-dts = CURRENT_TIMESTAMP
+,samid = '{2}'
+,status = '{3}'
+,dts = CURRENT_TIMESTAMP
 WHERE id = {4} ;"
   $sql = $baseSql -f $table, $_.gsuite, $_.samid, $_.status, $_.id
   $msg = $MyInvocation.MyCommand.Name, $_.employeeId, $_.mail, $_.status, $sql
