@@ -63,14 +63,17 @@ function Get-ADObj {
  process {
   $adParams = @{
    # this filter allows for our 2 types of email address
-   Filter     = "mail -eq `'{0}`' -or homepage -eq `'{0}`'" -f $_.emailWork
+   Filter     = "mail -eq '{0}' -or homepage -eq '{0}'" -f $_.emailWork
    Properties = 'employeeId', 'mail', 'homepage'
   }
+  Write-Verbose ($adParams.Filter | Out-String)
+  Write-Verbose ($adParams.Properties | Out-String)
   $obj = Get-ADUser @adParams
   if ($obj.count -gt 1) {
    Write-Error ('Multiple AD objects with email address [{0}]' -f $_.emailWork)
    return
   }
+  Write-Verbose ($obj | Out-String)
   $obj
  }
 }
@@ -78,16 +81,22 @@ function Get-ADObj {
 function New-PSObj {
  process {
   Write-Verbose ('{0}' -f $MyInvocation.MyCommand.Name)
+  if ($_.emailWork -is [DBNull]) {
+   Write-Error ('{0},Empid [{1}], emailWork Missing from DB entry. Skipping' -f $MyInvocation.MyCommand.Name, $_.empId)
+   return
+  }
   $obj = $_ | Get-ADObj
   if ($null -eq $obj) { return }
   # create object with AD ObjectGUID and Intermediate DB data
   [PSCustomObject]@{
    id         = $_.id
    employeeId = $_.employeeId
-   guid       = $obj.ObjectGUID
-   mail       = $_.emailWork
    fn         = $_.fn
    ln         = $_.ln
+   mail       = $_.emailWork
+   guid       = $obj.ObjectGUID
+   gsuite     = $obj.HomePage
+   samid      = $obj.SamAccountName
   }
  }
 }
@@ -111,12 +120,33 @@ function Update-ADEmpId {
 
 function Update-IntDB ($table, $dbParams) {
  process {
-  $sql = "UPDATE {0} SET status = `'{1}`', dts = CURRENT_TIMESTAMP WHERE id = {2};" -f $table, $_.status, $_.id
+  $baseSql = "
+UPDATE {0}
+SET
+gsuite = '{1}'
+samid = '{2}'
+status = '{3}',
+dts = CURRENT_TIMESTAMP
+WHERE id = {4} ;"
+  $sql = $baseSql -f $table, $_.gsuite, $_.samid, $_.status, $_.id
   $msg = $MyInvocation.MyCommand.Name, $_.employeeId, $_.mail, $_.status, $sql
   Write-Host ('{0},[{1}],[{2}],[{3}],[{4}]' -f $msg) -Fore DarkYellow
-  if (-not$WhatIf) { Invoke-SqlCmd @dbparams -Query $sql }
+  if (-not$WhatIf) {
+   Invoke-SqlCmd @dbparams -Query $sql
+  }
  }
 }
+
+# function Update-IntDB ($table, $dbParams) {
+#  process {
+#   $sql = "UPDATE {0} SET status = `'{1}`', dts = CURRENT_TIMESTAMP WHERE id = {2};" -f $table, $_.status, $_.id
+#   $msg = $MyInvocation.MyCommand.Name, $_.employeeId, $_.mail, $_.status, $sql
+#   Write-Host ('{0},[{1}],[{2}],[{3}],[{4}]' -f $msg) -Fore DarkYellow
+#   if (-not$WhatIf) {
+#    Invoke-SqlCmd @dbparams -Query $sql
+#   }
+#  }
+# }
 
 # ==================================================================
 
@@ -147,7 +177,6 @@ do {
  Clear-SessionData
 
  'SQLServer' | Load-Module
-
 
  $dc = Select-DomainController $DomainControllers
  New-ADSession -dc $dc -cmdlets 'Get-ADUser', 'Set-ADUser' -Cred $ActiveDirectoryCredential
