@@ -13,13 +13,13 @@ param(
   [string[]]$DomainControllers,
   [Alias('ADCred')]
   [System.Management.Automation.PSCredential]$ActiveDirectoryCredential,
-  [Alias('EmpServer')]
-  [string]$EmpDBServer,
-  [Alias('EmpDB')]
-  [string]$EmpDatabase,
-  [string]$EmpTable,
-  [Alias('EmpCred')]
-  [System.Management.Automation.PSCredential]$EmpDBCredential,
+  # [Alias('EmpServer')]
+  # [string]$EmpDBServer,
+  # [Alias('EmpDB')]
+  # [string]$EmpDatabase,
+  # [string]$EmpTable,
+  # [Alias('EmpCred')]
+  # [System.Management.Automation.PSCredential]$EmpDBCredential,
   [Alias('IntServer')]
   [string]$IntermediateSqlServer,
   [Alias('IntDB')]
@@ -30,7 +30,22 @@ param(
   [Alias('wi')]
   [switch]$WhatIf
 )
-
+function Compare-EmpId {
+  begin {
+  }
+  process {
+    Write-Host ('{0},[{1}],[{2}]' -f $MyInvocation.MyCommand.Name, $_.empId, $_.mail)
+    $obj = $_ | Get-ADObj
+    Write-Verbose ($obj.EmployeeId | Out-String)
+    Write-Verbose ($_.empId | out-string )
+    if ($obj.EmployeeId -ne $_.empId) {
+      Write-Error ('{0},[{1}],[{2}],EmployeeID not set correctly on AD object' -f $MyInvocation.MyCommand.Name, $_.empId, $_.mail)
+      return
+    }
+    $_ | Add-Member -MemberType NoteProperty -Name status -Value success
+    $_
+  }
+}
 function Get-IntDBData ($table, $dbParams) {
   process {
     $sql = 'SELECT * FROM {0} WHERE status IS NULL;' -f $table
@@ -46,18 +61,18 @@ function Get-IntDBData ($table, $dbParams) {
   }
 }
 
-function Get-EmpData ($dbParams, $table) {
-  process {
-    $sql = 'SELECT empId FROM {0} WHERE empId = {1};' -f $EmpTable, $_.empId
-    $emp = Invoke-SqlCmd @empDBParams -Query $sql
-    if (-not$emp) {
-      $msg = $MyInvocation.MyCommand.Name, $_.empId, $_.emailWork, $_.emailHome, $sql
-      Write-Error ('{0},EmpId [{1}] not found. EmailWork: [{2}],EmailHome: [{3}],[{4}]' -f $msg)
-      return
-    }
-    $_
-  }
-}
+# function Get-EmpData ($dbParams, $table) {
+#   process {
+#     $sql = 'SELECT empId FROM {0} WHERE empId = {1};' -f $table, $_.empId
+#     $emp = Invoke-SqlCmd @empDBParams -Query $sql
+#     if (-not$emp) {
+#       $msg = $MyInvocation.MyCommand.Name, $_.empId, $_.emailWork, $_.emailHome, $sql
+#       Write-Error ('{0},EmpId [{1}] not found. EmailWork: [{2}],EmailHome: [{3}],[{4}]' -f $msg)
+#       return
+#     }
+#     $_
+#   }
+# }
 
 function Get-ADObj {
   process {
@@ -89,14 +104,15 @@ function New-PSObj {
     if ($null -eq $obj) { return }
     # create object with AD ObjectGUID and Intermediate DB data
     [PSCustomObject]@{
-      id         = $_.id
-      employeeId = $_.empId
-      fn         = $_.fn
-      ln         = $_.ln
-      mail       = $_.emailWork
-      guid       = $obj.ObjectGUID
-      gsuite     = $obj.HomePage
-      samid      = $obj.SamAccountName
+      id        = $_.id
+      empId     = $_.empId
+      fn        = $_.fn
+      ln        = $_.ln
+      mail      = $_.emailWork
+      emailWork = $_.emailWork
+      guid      = $obj.ObjectGUID
+      gsuite    = $obj.HomePage
+      samid     = $obj.SamAccountName
     }
   }
 }
@@ -104,7 +120,7 @@ function New-PSObj {
 function Update-ADEmpId {
   process {
     $msg = $MyInvocation.MyCommand.Name, $_.empId, $_.mail
-    Write-Host ('{0},[{1}],[{2}]' -f $msg) -Fore DarkYellow
+    Write-Host ('{0},[{1}],[{2}]' -f $msg) -Fore Blue
     $setParams = @{
       Identity    = $_.guid
       EmployeeID  = $_.empId
@@ -113,7 +129,6 @@ function Update-ADEmpId {
       ErrorAction = 'Stop'
     }
     Set-ADUser @setParams
-    $_ | Add-Member -MemberType NoteProperty -Name status -Value success
     $_
   }
 }
@@ -130,7 +145,7 @@ gsuite = '{1}'
 WHERE id = {4} ;"
     $sql = $baseSql -f $table, $_.gsuite, $_.samid, $_.status, $_.id
     $msg = $MyInvocation.MyCommand.Name, $_.empId, $_.mail, $_.status, $sql
-    Write-Host ('{0},[{1}],[{2}],[{3}],[{4}]' -f $msg) -Fore DarkYellow
+    Write-Host ('{0},[{1}],[{2}],[{3}],[{4}]' -f $msg) -Fore Green
     if (-not$WhatIf) {
       Invoke-SqlCmd @dbparams -Query $sql
     }
@@ -152,11 +167,11 @@ $intDBparams = @{
   Credential = $IntermediateCredential
 }
 
-$empDBParams = @{
-  Server     = $EmpDBServer
-  Database   = $EmpDatabase
-  Credential = $EmpDBCredential
-}
+# $empDBParams = @{
+#   Server     = $EmpDBServer
+#   Database   = $EmpDatabase
+#   Credential = $EmpDBCredential
+# }
 
 $stopTime = Get-Date "9:00pm"
 $delay = 60
@@ -171,8 +186,9 @@ do {
   New-ADSession -dc $dc -cmdlets 'Get-ADUser', 'Set-ADUser' -Cred $ActiveDirectoryCredential
 
   $intDBResults = Get-IntDBData $AccountsTable $intDBparams
-  $opObjs = $intDBResults | Get-EmpData $empDBParams $EmpTable | New-PSObj
-  $opObjs | Update-ADEmpId | Update-IntDB $AccountsTable $intDBparams
+  # $opObjs = $intDBResults | Get-EmpData $empDBParams $EmpTable | New-PSObj
+  $opObjs = $intDBResults | New-PSObj
+  $opObjs | Update-ADEmpId | Compare-EmpId | Update-IntDB $AccountsTable $intDBparams
 
   Clear-SessionData
   Show-TestRun
