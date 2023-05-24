@@ -30,9 +30,8 @@ param(
   [Alias('wi')]
   [switch]$WhatIf
 )
+
 function Compare-EmpId {
-  begin {
-  }
   process {
     Write-Host ('{0},[{1}],[{2}]' -f $MyInvocation.MyCommand.Name, $_.empId, $_.mail)
     $obj = $_ | Get-ADObj
@@ -40,12 +39,13 @@ function Compare-EmpId {
     Write-Verbose ($_.empId | out-string )
     if ($obj.EmployeeId -ne $_.empId) {
       Write-Error ('{0},[{1}],[{2}],EmployeeID not set correctly on AD object' -f $MyInvocation.MyCommand.Name, $_.empId, $_.mail)
-      return
+      $status = 'Error - EmployeeId Not Set on AD Object.'
+      $_.status = $status
     }
-    $_ | Add-Member -MemberType NoteProperty -Name status -Value success
     $_
   }
 }
+
 function Get-IntDBData ($table, $dbParams) {
   process {
     $sql = 'SELECT * FROM {0} WHERE status IS NULL;' -f $table
@@ -95,54 +95,70 @@ function Get-ADObj {
 
 function New-PSObj {
   process {
+    $status = $null
     Write-Verbose ('{0}' -f $MyInvocation.MyCommand.Name)
     if ($_.emailWork -is [DBNull]) {
-      Write-Error ('{0},Empid [{1}], emailWork Missing from DB entry. Skipping' -f $MyInvocation.MyCommand.Name, $_.empId)
+      $msg = $MyInvocation.MyCommand.Name, $_.bpName, $_.instanceId, $_.empId
+      Write-Error ('{0},BP Name:[{1}],InstanceId:[{2}],Empid [{3}], emailWork Missing from DB entry' -f $msg)
+      $status = 'EmailWork Missing From DB'
+      # Something went wrong in the LFForms process. Go fix it!
       return
     }
     $obj = $_ | Get-ADObj
-    if ($null -eq $obj) { return }
+    if ($null -eq $obj) {
+      $msg = $MyInvocation.MyCommand.Name, $_.bpName, $_.instanceId, $_.empId
+      Write-Warning ('{0},BP Name:[{1}],InstanceId:[{2}],Empid [{3}], AD Object not found' -f $msg)
+      $status = 'AD Object Not Found'
+    }
     # create object with AD ObjectGUID and Intermediate DB data
     [PSCustomObject]@{
-      id        = $_.id
-      empId     = $_.empId
-      fn        = $_.fn
-      ln        = $_.ln
-      mail      = $_.emailWork
-      emailWork = $_.emailWork
-      guid      = $obj.ObjectGUID
-      gsuite    = $obj.HomePage
-      samid     = $obj.SamAccountName
+      id         = $_.id
+      empId      = $_.empId
+      fn         = $_.fn
+      ln         = $_.ln
+      mail       = $_.emailWork
+      emailWork  = $_.emailWork
+      guid       = $obj.ObjectGUID
+      gsuite     = $obj.HomePage
+      samid      = $obj.SamAccountName
+      status     = $status
+      bpName     = $_.bpName
+      instanceId = $_.instanceId
     }
   }
 }
 
 function Update-ADEmpId {
   process {
-    $msg = $MyInvocation.MyCommand.Name, $_.empId, $_.mail
-    Write-Host ('{0},[{1}],[{2}]' -f $msg) -Fore Blue
-    $setParams = @{
-      Identity    = $_.guid
-      EmployeeID  = $_.empId
-      Confirm     = $false
-      WhatIf      = $WhatIf
-      ErrorAction = 'Stop'
+    # Set empid on AD obj if no errors reported up to this point
+    if ($null -eq $_.status) {
+      $msg = $MyInvocation.MyCommand.Name, $_.empId, $_.mail
+      Write-Host ('{0},[{1}],[{2}]' -f $msg) -Fore Blue
+      $setParams = @{
+        Identity    = $_.guid
+        EmployeeID  = $_.empId
+        Confirm     = $false
+        WhatIf      = $WhatIf
+        ErrorAction = 'Stop'
+      }
+      Set-ADUser @setParams
+      $_.status = 'Success - Matching AD Object found and EmployeeId Updated'
     }
-    Set-ADUser @setParams
     $_
   }
 }
 
 function Update-IntDB ($table, $dbParams) {
   process {
+    # Write-Host ($_ | Out-String)
     $baseSql = "
-UPDATE {0}
-SET
-gsuite = '{1}'
-,samid = '{2}'
-,status = '{3}'
-,dts = CURRENT_TIMESTAMP
-WHERE id = {4} ;"
+      UPDATE {0}
+      SET
+      gsuite = '{1}'
+      ,samid = '{2}'
+      ,status = '{3}'
+      ,dts = CURRENT_TIMESTAMP
+      WHERE id = {4} ;"
     $sql = $baseSql -f $table, $_.gsuite, $_.samid, $_.status, $_.id
     $msg = $MyInvocation.MyCommand.Name, $_.empId, $_.mail, $_.status, $sql
     Write-Host ('{0},[{1}],[{2}],[{3}],[{4}]' -f $msg) -Fore Green
@@ -173,7 +189,7 @@ $intDBparams = @{
 #   Credential = $EmpDBCredential
 # }
 
-$stopTime = Get-Date "9:00pm"
+$stopTime = Get-Date "6:00pm"
 $delay = 60
 'Process looping every {0} seconds until {1}' -f $delay, $stopTime
 do {
@@ -186,7 +202,6 @@ do {
   New-ADSession -dc $dc -cmdlets 'Get-ADUser', 'Set-ADUser' -Cred $ActiveDirectoryCredential
 
   $intDBResults = Get-IntDBData $AccountsTable $intDBparams
-  # $opObjs = $intDBResults | Get-EmpData $empDBParams $EmpTable | New-PSObj
   $opObjs = $intDBResults | New-PSObj
   $opObjs | Update-ADEmpId | Compare-EmpId | Update-IntDB $AccountsTable $intDBparams
 
@@ -194,8 +209,6 @@ do {
   Show-TestRun
   if (-not$WhatIf) {
     # Loop delay
-    # $nextRun = (Get-Date).AddSeconds($delay)
-    # 'Next Run: {0}' -f $nextRun
     Start-Sleep $delay
   }
 } until ($WhatIf -or ((Get-Date) -ge $stopTime))
