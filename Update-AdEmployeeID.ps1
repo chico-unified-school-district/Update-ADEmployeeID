@@ -142,7 +142,7 @@ function Update-ADEmpId {
         ErrorAction = 'Stop'
       }
       Set-ADUser @setParams
-      $_.status = 'Success - Matching AD Object found and EmployeeId Updated'
+      $_.status = 'success'
     }
     $_
   }
