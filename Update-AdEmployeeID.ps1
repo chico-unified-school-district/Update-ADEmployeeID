@@ -31,6 +31,25 @@ param(
   [switch]$WhatIf
 )
 
+function Clear-AccountExpiration {
+  process {
+    # Set empid on AD obj if no errors reported up to this point
+    if ($null -eq $_.status) {
+      $msg = $MyInvocation.MyCommand.Name, $_.empId, $_.mail
+      Write-Host ('{0},[{1}],[{2}]' -f $msg) -Fore Blue
+      $setParams = @{
+        Identity              = $_.guid
+        AccountExpirationDate = $null
+        Confirm               = $false
+        WhatIf                = $WhatIf
+        ErrorAction           = 'Stop'
+      }
+      Set-ADUser @setParams
+    }
+    $_
+  }
+}
+
 function Compare-EmpId {
   process {
     Write-Host ('{0},[{1}],[{2}]' -f $MyInvocation.MyCommand.Name, $_.empId, $_.mail)
@@ -203,7 +222,7 @@ do {
 
   $intDBResults = Get-IntDBData $AccountsTable $intDBparams
   $opObjs = $intDBResults | New-PSObj
-  $opObjs | Update-ADEmpId | Compare-EmpId | Update-IntDB $AccountsTable $intDBparams
+  $opObjs | Clear-AccountExpiration | Update-ADEmpId | Compare-EmpId | Update-IntDB $AccountsTable $intDBparams
 
   Clear-SessionData
   Show-TestRun
