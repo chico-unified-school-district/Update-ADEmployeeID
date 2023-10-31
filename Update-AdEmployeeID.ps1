@@ -73,19 +73,6 @@ function Get-IntDBData ($table, $dbParams) {
   }
 }
 
-# function Get-EmpData ($dbParams, $table) {
-#   process {
-#     $sql = 'SELECT empId FROM {0} WHERE empId = {1};' -f $table, $_.empId
-#     $emp = Invoke-SqlCmd @empDBParams -Query $sql
-#     if (-not$emp) {
-#       $msg = $MyInvocation.MyCommand.Name, $_.empId, $_.emailWork, $_.emailHome, $sql
-#       Write-Error ('{0},EmpId [{1}] not found. EmailWork: [{2}],EmailHome: [{3}],[{4}]' -f $msg)
-#       return
-#     }
-#     $_
-#   }
-# }
-
 function Get-ADObj {
   process {
     $adParams = @{
