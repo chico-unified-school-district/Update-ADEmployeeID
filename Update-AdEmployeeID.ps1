@@ -13,13 +13,6 @@ param(
   [string[]]$DomainControllers,
   [Alias('ADCred')]
   [System.Management.Automation.PSCredential]$ActiveDirectoryCredential,
-  # [Alias('EmpServer')]
-  # [string]$EmpDBServer,
-  # [Alias('EmpDB')]
-  # [string]$EmpDatabase,
-  # [string]$EmpTable,
-  # [Alias('EmpCred')]
-  # [System.Management.Automation.PSCredential]$EmpDBCredential,
   [Alias('IntServer')]
   [string]$IntermediateSqlServer,
   [Alias('IntDB')]
@@ -197,16 +190,11 @@ function Update-IntDB ($table, $dbParams) {
 . .\lib\Show-TestRun.ps1
 
 $intDBparams = @{
-  Server     = $IntermediateSqlServer
-  Database   = $IntermediateDatabase
-  Credential = $IntermediateCredential
+  Server                 = $IntermediateSqlServer
+  Database               = $IntermediateDatabase
+  Credential             = $IntermediateCredential
+  TrustServerCertificate = $true
 }
-
-# $empDBParams = @{
-#   Server     = $EmpDBServer
-#   Database   = $EmpDatabase
-#   Credential = $EmpDBCredential
-# }
 
 $stopTime = Get-Date "6:00pm"
 $delay = 60
