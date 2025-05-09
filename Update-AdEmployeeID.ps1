@@ -1,6 +1,6 @@
 <#
  .Synopsis
-  Sync Employee Database ID with AD User EmployeeId via the email address listed in AD.
+  Sync Employee ID from Staff Database with AD User EmployeeId via the email address listed in AD.
  .DESCRIPTION
  .EXAMPLE
  .EXAMPLE
