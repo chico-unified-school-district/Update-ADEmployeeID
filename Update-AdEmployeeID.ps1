@@ -106,15 +106,16 @@ $intDBparams = @{
 Write-Host 'Process looping every 60 seconds until 6PM' -F Green
 do {
  Clear-SessionData
- $results = Get-IntDBData $AccountsTable $intDBparams | New-Obj | Set-ADData
 
+ $results = Get-IntDBData $AccountsTable $intDBparams | New-Obj
  if ($results) {
   Connect-ADSession -DomainControllers $DomainControllers -Credential $ADCredential -Cmdlets 'Get-ADUser', 'Set-ADUser'
   $results |
-   Update-ADObj |
-    Set-ADData |
-     Update-IntDB $AccountsTable $intDBparams |
-      Complete-Processing
+   Set-ADData |
+    Update-ADObj |
+     Set-ADData |
+      Update-IntDB $AccountsTable $intDBparams |
+       Complete-Processing
  }
 
  Clear-SessionData
