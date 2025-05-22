@@ -109,8 +109,7 @@ do {
  $results = Get-IntDBData $AccountsTable $intDBparams | New-Obj | Set-ADData
 
  if ($results) {
-  $dc = Select-DomainController $DomainControllers
-  New-ADSession -dc $dc -cmdlets 'Get-ADUser', 'Set-ADUser' -Cred $ADCredential
+  Connect-ADSession -DomainControllers $DomainControllers -cmdlets 'Get-ADUser', 'Set-ADUser' -Cred $ADCredential
   $results |
    Update-ADObj |
     Set-ADData |
