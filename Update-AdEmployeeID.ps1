@@ -64,7 +64,7 @@ function Set-ADData {
 function Update-ADObj {
  process {
   if ($_.status) { return $_ }
-  Write-Host ('{0},[{1}],[Old EmpId:{2}],[New EmpId:{3}]' -f $MyInvocation.MyCommand.Name, $_.db.emailWork, $_.ad.EmployeeID, $_.db.empId ) -Fore Blue
+  Write-Host ('{0},{1},Old EmpId:{2},New EmpId:{3}' -f $MyInvocation.MyCommand.Name, $_.db.emailWork, $_.ad.EmployeeID, $_.db.empId ) -Fore Blue
   $setParams = @{
    Identity              = $_.ad.ObjectGUID
    EmployeeID            = $_.db.empId
@@ -83,7 +83,7 @@ function Update-IntDB ($table, $dbParams) {
  process {
   $sql = "UPDATE $table SET gsuite = @gsuite, samid = @sam ,status = @status ,dts = CURRENT_TIMESTAMP WHERE id = @id ;"
   $sqlVars = "gsuite=$($_.ad.HomePage)", "sam=$($_.ad.SamAccountName)", "status=$($_.status)", "id=$($_.db.id)"
-  Write-Host ('{0},[{1}],status:[{2}]' -f $MyInvocation.MyCommand.Name, $_.db.emailWork, $_.status) -F DarkMagenta
+  Write-Host ('{0},{1},status:{2}' -f $MyInvocation.MyCommand.Name, $_.db.emailWork, $_.status) -F DarkMagenta
   Write-Verbose ('{0},[{1}],[{2}]' -f $MyInvocation.MyCommand.Name, $sql, ($sqlVars -join ','))
   if (!$WhatIf -and $_.status) { New-SqlOperation @dbparams -Query $sql -Parameters $sqlVars }
   $_
@@ -109,7 +109,7 @@ do {
  $results = Get-IntDBData $AccountsTable $intDBparams | New-Obj | Set-ADData
 
  if ($results) {
-  Connect-ADSession -DomainControllers $DomainControllers -cmdlets 'Get-ADUser', 'Set-ADUser' -Cred $ADCredential
+  Connect-ADSession -DomainControllers $DomainControllers -Credential $ADCredential -Cmdlets 'Get-ADUser', 'Set-ADUser'
   $results |
    Update-ADObj |
     Set-ADData |
